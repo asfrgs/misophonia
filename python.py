@@ -21,6 +21,8 @@ import soundfile as sf
 import streamlit as st
 from scipy.signal import resample_poly
 
+APP_NAME = "Misophonia Trigger Shield"
+
 # ==========================================================================
 # FIXED CONFIG
 # ==========================================================================
@@ -42,7 +44,6 @@ HOP, WIN = 0.48, 0.96
 
 # folder to scan for background sounds (same folder as this script)
 BG_DIR = Path(__file__).parent
-
 BG_EXT = {".mp3", ".wav", ".ogg", ".flac", ".m4a"}
 # emoji icon guessed from the file name
 BG_ICONS = [
@@ -184,47 +185,108 @@ def background_picker(key_prefix):
     if not bgs:
         st.caption("No background sound files found in the app folder.")
         return selections
-    st.write("Set a volume above 0 to mix that sound in.")
+    st.caption("Set a volume above 0 to mix that sound in.")
     cols = st.columns(3)
     for i, (path, emoji, name) in enumerate(bgs):
         with cols[i % 3]:
-            st.markdown(
-                f"<div style='font-size:46px;text-align:center;line-height:1'>{emoji}</div>",
-                unsafe_allow_html=True,
-            )
-            st.markdown(f"<div style='text-align:center;font-size:13px'>{name}</div>",
-                        unsafe_allow_html=True)
-            vol = st.slider("volume", 0, 100, 0, key=f"{key_prefix}_bg_{i}",
-                            label_visibility="collapsed")
-            if vol > 0:
-                selections.append((path, vol / 100.0))
+            with st.container(border=True):
+                st.markdown(
+                    f"<div style='font-size:42px;text-align:center;line-height:1'>{emoji}</div>"
+                    f"<div style='text-align:center;font-size:12px;color:#4a5578;"
+                    f"margin:.2rem 0 .3rem'>{name}</div>",
+                    unsafe_allow_html=True,
+                )
+                vol = st.slider("volume", 0, 100, 0, key=f"{key_prefix}_bg_{i}",
+                                label_visibility="collapsed")
+                if vol > 0:
+                    selections.append((path, vol / 100.0))
     return selections
 
 
-def run_app():
-    st.set_page_config(page_title="Misophonia Trigger Shield", page_icon="🛡️")
+def inject_style():
+    st.markdown("""
+    <style>
+      /* hide Streamlit chrome (top white bar, menu, footer) */
+      [data-testid="stHeader"] { display:none; }
+      #MainMenu, footer { visibility:hidden; }
 
-    # --- Logo ---
-    logo_path = Path(__file__).parent / "logo.png"
-    if logo_path.exists():
-        b64 = base64.b64encode(logo_path.read_bytes()).decode()
+      /* ---- page ---- */
+      .stApp {
+        background: linear-gradient(180deg,#eef1fb 0%, #f7f8fc 40%, #ffffff 100%);
+        color:#1f2740;
+      }
+      .block-container { padding-top: 2.4rem; max-width: 760px; }
+
+      /* ---- hero ---- */
+      .hero { text-align:center; margin: .4rem 0 1.6rem 0; }
+      .hero img { width: 210px; height:auto; margin-bottom:.5rem;
+                  filter: drop-shadow(0 8px 24px rgba(99,102,241,.22)); }
+      .hero h1 { font-size:1.8rem; font-weight:800; margin:.3rem 0 .2rem;
+                 color:#1f2740; }
+      .hero p  { color:#5a6688; font-size:1rem; margin:0 auto; max-width:460px; }
+
+      /* ---- tabs ---- */
+      [data-baseweb="tab-list"] { gap:.5rem; justify-content:center;
+          border-bottom:none; margin-bottom:.4rem; }
+      [data-baseweb="tab"] { background:#eceffb; border-radius:12px;
+          padding:.5rem 1.4rem; color:#4a5578; font-weight:600; }
+      [aria-selected="true"][data-baseweb="tab"] {
+          background:linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff; }
+
+      /* ---- buttons ---- */
+      .stButton>button, .stDownloadButton>button {
+          background:linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff;
+          border:none; border-radius:12px; padding:.55rem 1.6rem;
+          font-weight:600; box-shadow:0 8px 20px rgba(99,102,241,.32);
+          transition:transform .08s ease; }
+      .stButton>button:hover, .stDownloadButton>button:hover {
+          transform:translateY(-1px); color:#fff; }
+
+      /* ---- uploader / cards ---- */
+      [data-testid="stFileUploaderDropzone"] {
+          background:#fff; border:1.5px dashed #c7cdf0; border-radius:16px;
+          box-shadow:0 8px 24px rgba(31,39,64,.06); }
+      [data-testid="stExpander"] { border:1px solid #e6e9f5;
+          border-radius:14px; background:#fff;
+          box-shadow:0 6px 18px rgba(31,39,64,.05); }
+      [data-testid="stNotification"] { border-radius:12px; }
+      audio { width:100%; }
+    </style>
+    """, unsafe_allow_html=True)
+
+
+def render_header():
+    logo = Path(__file__).parent / "logo.png"
+    sub = ("AI that quietens chewing, coughing, typing &amp; more — "
+           "so you can listen in peace.")
+    if logo.exists():
+        b64 = base64.b64encode(logo.read_bytes()).decode()
         st.markdown(
-            f'<img src="data:image/png;base64,{b64}" style="width:100%;max-width:480px;display:block;margin-bottom:8px">',
-            unsafe_allow_html=True,
-        )
+            f"<div class='hero'><img src='data:image/png;base64,{b64}'/>"
+            f"<p>{sub}</p></div>", unsafe_allow_html=True)
+    else:
+        st.markdown(
+            f"<div class='hero'><h1>🛡️ {APP_NAME}</h1><p>{sub}</p></div>",
+            unsafe_allow_html=True)
+
+
+def run_app():
+    st.set_page_config(page_title=APP_NAME, page_icon="🛡️", layout="centered")
+    inject_style()
+    render_header()
 
     load_yamnet()
     if USE_DEEPFILTERNET:
         load_df()
 
-    tab_up, tab_rt = st.tabs(["📁 Upload", "🎙️ Live"])
+    tab_up, tab_rt = st.tabs(["📁  Upload", "🎙️  Live"])
 
     # ---- Upload ----------------------------------------------------------
     with tab_up:
         up = st.file_uploader("Upload audio / video",
                               type=["mp3", "wav", "m4a", "aac", "flac", "ogg",
                                     "mp4", "mkv", "mov", "avi", "webm"],
-                              key="uploader")
+                              key="uploader", label_visibility="collapsed")
 
         process_clicked = st.button("Process", type="primary", key="process_btn")
 
@@ -234,17 +296,17 @@ def run_app():
         if up and process_clicked:
             tmp = Path(tempfile.mkdtemp()) / up.name
             tmp.write_bytes(up.getbuffer())
-            with st.spinner("Processing..."):
+            with st.spinner("Shielding your audio..."):
                 out_path = process_file(tmp, bg_selections)
-            st.success("Done!")
+            st.success("Done — triggers reduced.")
             c1, c2 = st.columns(2)
             with c1:
-                st.caption("Original")
+                st.markdown("**🔊 Original**")
                 st.audio(str(tmp))
             with c2:
-                st.caption("Cleaned")
+                st.markdown("**🛡️ Shielded**")
                 st.audio(str(out_path))
-            st.download_button("⬇️ Download cleaned audio",
+            st.download_button("⬇️ Download shielded audio",
                                data=Path(out_path).read_bytes(),
                                file_name="cleaned.wav", mime="audio/wav",
                                key="download_btn")
@@ -331,9 +393,30 @@ def run_app():
                     new.sample_rate = sr
                     return new
 
+            # STUN + TURN (metered.ca) so live works on the cloud behind
+            # NAT/firewalls. Password comes from Streamlit Secrets (safe for
+            # GitHub). Locally, falls back to the value below.
+            try:
+                turn_cred = st.secrets["TURN_PASSWORD"]
+            except Exception:
+                turn_cred = "YAHAN_APNA_PASSWORD_PASTE_KARO"   # local fallback
+            rtc_config = {"iceServers": [
+                {"urls": ["stun:stun.relay.metered.ca:80"]},
+                {
+                    "urls": [
+                        "turn:global.relay.metered.ca:80",
+                        "turn:global.relay.metered.ca:80?transport=tcp",
+                        "turn:global.relay.metered.ca:443",
+                        "turns:global.relay.metered.ca:443?transport=tcp",
+                    ],
+                    "username": "4f41be2a1d3765c146ef0e9b",
+                    "credential": turn_cred,
+                },
+            ]}
             webrtc_streamer(
                 key="shush-rt",
                 mode=WebRtcMode.SENDRECV,
+                rtc_configuration=rtc_config,
                 audio_frame_callback=Reducer(bg_live).recv,
                 media_stream_constraints={"audio": True, "video": False},
             )
